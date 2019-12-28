@@ -1,6 +1,10 @@
 #include <ncurses.h>
 #include<string>
 #include <locale.h>
+#include <cassert>
+
+#include "Baddy.h"
+
 using namespace std;
 
 #define LEFT 68
@@ -8,19 +12,32 @@ using namespace std;
 #define UP 65
 #define DOWN 66
 #define SPACE 32
+#define PLAYER_PAIR 1
+#define COIN_PAIR 2
+#define BADDY_PAIR 3
 
 // Prototypes
 void play();
 void resetWindow(WINDOW * win);
+Baddy * addBaddy(Baddy * baddies, int &baddyCount);
 
 int main(int argc, char ** argv)
 {
   // Initialize NCurses
   initscr();
+  if (!has_colors()) {
+    endwin();
+    printf("Your terminal does not support color :(\n");
+    exit(1);
+  }
+
+  start_color();
+  init_pair(PLAYER_PAIR, COLOR_GREEN, COLOR_BLACK);
+  init_pair(COIN_PAIR, COLOR_YELLOW, COLOR_BLACK);
+  init_pair(BADDY_PAIR, COLOR_RED, COLOR_BLACK);
   cbreak();
   noecho();
   curs_set(0);
-  setlocale(LC_ALL, "");
 
   // Run game loop
   play();
@@ -43,13 +60,17 @@ void play(){
   int coin_x = rand() % (78-1 + 1) + 1;
   int coin_y =  rand() % (38-1 + 1) + 1;
   int life = 3;
+  int baddyCount = 0;
   string playerCoords;
   string keyPressDirection;
   string pointStr = "POINTS: " + to_string(points) + "     ";
   string lifeStr = "LIFE: " + to_string(life) + "     ";
+  string baddyStr;
   bool playing = true;
   WINDOW * info_win = newwin(height, width/2, win_y , win_x + width + 2);
   WINDOW * win = newwin(height, width, win_y, win_x);
+  Baddy * baddies = new (nothrow) Baddy[baddyCount];
+  assert(baddies);
 
   keypad(win, true);
   refresh();
@@ -57,7 +78,7 @@ void play(){
   box(win, 0, 0);
   mvwprintw(win, 0, 5, "[THE CURSE OF CURSES]");
   resetWindow(win);
-  mvwprintw(win, char_y, char_x, "X");
+  mvwprintw(win, char_y, char_x, "O");
   mvwprintw(win, coin_y, coin_x, "$");
 
   box(info_win, 0, 0);
@@ -105,19 +126,51 @@ void play(){
       points++;
       coin_x = rand() % (78-1 + 1) + 1;
       coin_y =  rand() % (38-1 + 1) + 1;
+      if (points && !(points % 1))
+        baddies = addBaddy(baddies, baddyCount);
+    }
+    // Handle Baddies
+    for (int i = 0; i < baddyCount; i++){
+      if (!baddies[i].alive) continue;
+      if (baddies[i].collision(char_y, char_x))
+      {
+        life--;
+        baddies[i].die();
+        continue;
+      }
+      if (baddyCount > 5)
+          baddies[i].move();
+      if (baddies[i].collision(char_y, char_x))
+      {
+        life--;
+        baddies[i].die();
+        continue;
+      }
     }
     // Populate Info Window
     lifeStr = "LIFE: " + to_string(life) + "     ";
     pointStr = "POINTS: " + to_string(points) + "     ";
+    baddyStr = "DIFFICULTY: " + to_string(baddyCount) + "     ";
     playerCoords = "X: " + to_string(char_x) + " Y: " + to_string(char_y) + "       ";
     mvwprintw(info_win, 1, 1, lifeStr.c_str());
     mvwprintw(info_win, 2, 1, pointStr.c_str());
-    mvwprintw(info_win, 3, 1, keyPressDirection.c_str());
-    mvwprintw(info_win, 4, 1, playerCoords.c_str());
-
+    mvwprintw(info_win, 3, 1, baddyStr.c_str());
+    mvwprintw(info_win, 4, 1, keyPressDirection.c_str());
+    mvwprintw(info_win, 5, 1, playerCoords.c_str());
+    // Game stuff
     resetWindow(win);
-    mvwprintw(win, char_y, char_x, "X");
+    wattron(win, COLOR_PAIR(PLAYER_PAIR));
+    mvwprintw(win, char_y, char_x, "O");
+    wattroff(win, COLOR_PAIR(PLAYER_PAIR));
+    wattron(win, COLOR_PAIR(COIN_PAIR));
     mvwprintw(win, coin_y, coin_x, "$");
+    wattroff(win, COLOR_PAIR(COIN_PAIR));
+    wattron(win, COLOR_PAIR(BADDY_PAIR));
+    for (int i = 0; i < baddyCount; i++)
+      if (baddies[i].alive)
+        mvwprintw(win, baddies[i].y, baddies[i].x, "X");
+    wattroff(win, COLOR_PAIR(BADDY_PAIR));
+
 
     wrefresh(win);
     wrefresh(info_win);
@@ -133,4 +186,27 @@ void resetWindow(WINDOW * win)
       mvwprintw(win, y, x, " ");
 
   return;
+}
+
+Baddy * addBaddy(Baddy * baddies, int &baddyCount)
+{
+  int lengthNeeded = 1;
+
+  // No need to copy the "dead" bad guys
+  for (int i = 0; i < baddyCount; i++)
+    if (baddies[i].alive) lengthNeeded++;
+  // Copy living baddies into new memory reserve
+  Baddy * newBaddiesList = new (nothrow) Baddy[lengthNeeded];
+  assert(newBaddiesList);
+  for (int i = 0; i < baddyCount; i++)
+    if (baddies[i].alive)
+      newBaddiesList[i] = baddies[i];
+  // Add the new baddy and increase total baddy count
+  Baddy newBaddy;
+  newBaddiesList[lengthNeeded - 1] = newBaddy;
+  baddyCount = lengthNeeded;
+  // Delete old list and make it official
+  delete [] baddies;
+
+  return newBaddiesList;
 }
