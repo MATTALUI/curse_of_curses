@@ -70,6 +70,7 @@ void play(){
   WINDOW * info_win = newwin(height, width/2, win_y , win_x + width + 2);
   WINDOW * win = newwin(height, width, win_y, win_x);
   Baddy * baddies = new (nothrow) Baddy[baddyCount];
+  Baddy * lastBaddy;
   assert(baddies);
 
   keypad(win, true);
@@ -130,21 +131,21 @@ void play(){
         baddies = addBaddy(baddies, baddyCount);
     }
     // Handle Baddies
-    for (int i = 0; i < baddyCount; i++){
-      if (!baddies[i].alive) continue;
-      if (baddies[i].collision(char_y, char_x))
+    lastBaddy = baddies + baddyCount;
+    for (Baddy * baddy = baddies; baddy != lastBaddy; ++baddy)
+    {
+      if (!baddy->alive) continue;
+      if (baddy->collision(char_y, char_x))
       {
         life--;
-        baddies[i].die();
+        baddy->die();
         continue;
       }
-      if (baddyCount > 5)
-          baddies[i].move();
-      if (baddies[i].collision(char_y, char_x))
+      if (baddyCount > 5) baddy->move();
+      if (baddy->collision(char_y, char_x))
       {
         life--;
-        baddies[i].die();
-        continue;
+        baddy->die();
       }
     }
     // Populate Info Window
