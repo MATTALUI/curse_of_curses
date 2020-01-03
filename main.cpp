@@ -4,14 +4,10 @@
 #include <cassert>
 
 #include "Baddy.h"
+#include "Hero.h"
 
 using namespace std;
 
-#define LEFT 68
-#define RIGHT 67
-#define UP 65
-#define DOWN 66
-#define SPACE 32
 #define PLAYER_PAIR 1
 #define COIN_PAIR 2
 #define BADDY_PAIR 3
@@ -54,17 +50,15 @@ void play(){
   int width = 80;
   int win_x = 5;
   int win_y = 5;
-  int char_x = width / 2;
-  int char_y = height / 2;
   int points = 0;
   int coin_x = rand() % (78-1 + 1) + 1;
   int coin_y =  rand() % (38-1 + 1) + 1;
-  int life = 3;
   int baddyCount = 0;
+  Hero hero(height / 2, width / 2);
   string playerCoords;
   string keyPressDirection;
   string pointStr = "POINTS: " + to_string(points) + "     ";
-  string lifeStr = "LIFE: " + to_string(life) + "     ";
+  string lifeStr = "LIFE: " + to_string(hero.life()) + "     ";
   string baddyStr;
   bool playing = true;
   WINDOW * info_win = newwin(height, width/2, win_y , win_x + width + 2);
@@ -79,7 +73,7 @@ void play(){
   box(win, 0, 0);
   mvwprintw(win, 0, 5, "[THE CURSE OF CURSES]");
   resetWindow(win);
-  mvwprintw(win, char_y, char_x, "O");
+  mvwprintw(win, hero.y(), hero.x(), "O");
   mvwprintw(win, coin_y, coin_x, "$");
 
   box(info_win, 0, 0);
@@ -94,35 +88,11 @@ void play(){
   {
     // Interpret input
     key = getch();
-    switch (key)
-    {
-      case LEFT:
-        keyPressDirection = "KEYPRESS: LEFT    ";
-        char_x--;
-        break;
-      case RIGHT:
-        keyPressDirection = "KEYPRESS: RIGHT    ";
-        char_x++;
-        break;
-      case UP:
-        keyPressDirection = "KEYPRESS: UP    ";
-        char_y--;
-        break;
-      case DOWN:
-        keyPressDirection = "KEYPRESS: DOWN    ";
-        char_y++;
-        break;
-      default:
-        break;
-    }
-    // Prevent out-of-bounds
-    if (char_x < 1) char_x = 1;
-    if (char_x > 78) char_x = 78;
-    if (char_y < 1) char_y = 1;
-    if (char_y > 38) char_y = 38;
+    // Control hero
+    hero.handleInput(key);
     // Check if collected the coin
-    if (char_x == coin_x &&
-        char_y == coin_y)
+    if (hero.x() == coin_x &&
+        hero.y() == coin_y)
     {
       points++;
       coin_x = rand() % (78-1 + 1) + 1;
@@ -135,24 +105,25 @@ void play(){
     for (Baddy * baddy = baddies; baddy != lastBaddy; ++baddy)
     {
       if (!baddy->alive) continue;
-      if (baddy->collision(char_y, char_x))
+      if (baddy->collision(hero.y(), hero.x()))
       {
-        life--;
+        hero.hurt();
         baddy->die();
         continue;
       }
       if (baddyCount > 5) baddy->move();
-      if (baddy->collision(char_y, char_x))
+      if (baddy->collision(hero.y(), hero.x()))
       {
-        life--;
+        hero.hurt();
         baddy->die();
       }
     }
     // Populate Info Window
-    lifeStr = "LIFE: " + to_string(life) + "     ";
+    lifeStr = "LIFE: " + to_string(hero.life()) + "     ";
     pointStr = "POINTS: " + to_string(points) + "     ";
     baddyStr = "DIFFICULTY: " + to_string(baddyCount) + "     ";
-    playerCoords = "X: " + to_string(char_x) + " Y: " + to_string(char_y) + "       ";
+    keyPressDirection = "KEY: " + to_string(key) + "        ";
+    playerCoords = "X: " + to_string(hero.x()) + " Y: " + to_string(hero.y()) + "       ";
     mvwprintw(info_win, 1, 1, lifeStr.c_str());
     mvwprintw(info_win, 2, 1, pointStr.c_str());
     mvwprintw(info_win, 3, 1, baddyStr.c_str());
@@ -161,7 +132,7 @@ void play(){
     // Game stuff
     resetWindow(win);
     wattron(win, COLOR_PAIR(PLAYER_PAIR));
-    mvwprintw(win, char_y, char_x, "O");
+    mvwprintw(win, hero.y(), hero.x(), "O");
     wattroff(win, COLOR_PAIR(PLAYER_PAIR));
     wattron(win, COLOR_PAIR(COIN_PAIR));
     mvwprintw(win, coin_y, coin_x, "$");
